@@ -80,6 +80,7 @@ except Exception:
 
 
 # You can override cookies via environment variables or a `cookies.json` file.
+# - COOKIE_JSON: A JSON string containing cookie key-value pairs (from .env file).
 # - TERABOX_COOKIES_JSON: A JSON string containing cookie key-value pairs.
 # - TERABOX_COOKIES_FILE: The path to a JSON file with cookies.
 #   If not set, the application defaults to loading `cookies.json`.
@@ -87,30 +88,43 @@ except Exception:
 
 def load_cookies() -> dict[str, str]:
     """Load cookies from environment variables or a local file."""
-    raw = os.getenv("TERABOX_COOKIES_JSON")
-    # Default to 'cookies.json' if the env var is not set
-    file_path = os.getenv("TERABOX_COOKIES_FILE", "cookies.json")
     data = None
-
-    if raw:
+    
+    # First try COOKIE_JSON from .env file
+    cookie_json = os.getenv("COOKIE_JSON")
+    if cookie_json:
         try:
             import json
-
-            data = json.loads(raw)
+            data = json.loads(cookie_json)
+            logging.info("Loaded cookies from COOKIE_JSON environment variable")
         except Exception as e:
-            logging.warning(f"Failed to parse TERABOX_COOKIES_JSON: {e}")
-
-    if not data and file_path:
-        try:
-            import json
-
-            with open(file_path, "r", encoding="utf-8") as f:
-                data = json.load(f)
-        except FileNotFoundError:
-            # This is not an error if cookies are provided via other means
-            pass
-        except Exception as e:
-            logging.warning(f"Failed to read '{file_path}': {e}")
+            logging.warning(f"Failed to parse COOKIE_JSON: {e}")
+    
+    # Fall back to TERABOX_COOKIES_JSON environment variable
+    if not data:
+        raw = os.getenv("TERABOX_COOKIES_JSON")
+        if raw:
+            try:
+                import json
+                data = json.loads(raw)
+                logging.info("Loaded cookies from TERABOX_COOKIES_JSON environment variable")
+            except Exception as e:
+                logging.warning(f"Failed to parse TERABOX_COOKIES_JSON: {e}")
+    
+    # Fall back to TERABOX_COOKIES_FILE environment variable
+    if not data:
+        file_path = os.getenv("TERABOX_COOKIES_FILE")
+        if file_path:
+            try:
+                import json
+                with open(file_path, "r", encoding="utf-8") as f:
+                    data = json.load(f)
+                logging.info(f"Loaded cookies from '{file_path}' file")
+            except FileNotFoundError:
+                # This is not an error if cookies are provided via other means
+                pass
+            except Exception as e:
+                logging.warning(f"Failed to read '{file_path}': {e}")
 
     if isinstance(data, dict):
         return {k: str(v) for k, v in data.items()}
